@@ -2,9 +2,12 @@
 
 A collection of smaller games and projects.
 
+## Complete
+
+- [x] [Who's That Pokémon](whos-that-pokemon/): guess the Pokémon from clues pulled from PokéAPI, in a Pokédex GUI or the terminal
+
 ## TODO
 
-- [ ] Who's That Pokémon (using an API)
 - [ ] PortalKing
 - [ ] Demon Bluff solver
 - [ ] Minesweeper
