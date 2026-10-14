@@ -5,6 +5,7 @@ A collection of smaller games and projects.
 ## Complete
 
 - [x] [Who's That Pokémon](whos-that-pokemon/): guess the Pokémon from clues pulled from PokéAPI, in a Pokédex GUI or the terminal
+- [x] [KTH schedule finder](schedule-finder/): finds TA labs and övningar that don't clash with your own courses on TimeEdit, and adds the ones you pick to Google Calendar
 
 ## TODO
 
