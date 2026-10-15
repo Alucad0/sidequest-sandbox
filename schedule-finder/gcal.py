@@ -1,3 +1,4 @@
+import warnings
 from datetime import datetime, time, timedelta
 from pathlib import Path
 
@@ -12,6 +13,8 @@ TIMEZONE = "Europe/Stockholm"
 
 
 def connect():
+    # Google's libraries warn on every run that Python 3.10 won't get their future updates; it still works
+    warnings.filterwarnings("ignore", category=FutureWarning, module=r"google\.")
     try:
         from google.auth.transport.requests import Request
         from google.oauth2.credentials import Credentials

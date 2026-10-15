@@ -93,9 +93,9 @@ def load_course(code, restrictions, start, end, default_activities=None, ask=Fal
     object_id, name = find_course(code)
     all_events = course_events(object_id, code, start, end)
     if ask:
+        # every class can have its own activities, so ask for each one; an @ typed at the prompt is the default
         for r in restrictions:
-            if not r.activities:
-                r.activities = ask_activities(code, r, [e for e in all_events if matches(e, r.filters)], default_activities)
+            r.activities = ask_activities(code, r, [e for e in all_events if matches(e, r.filters)], r.activities or default_activities)
     events = [
         e for e in all_events
         if any(matches(e, r.filters) and activity_matches(e.activity, r.activities or default_activities) for r in restrictions)
@@ -111,7 +111,7 @@ def ask_activities(code, restriction, events, default):
         if e.activity:
             counts[e.activity] = counts.get(e.activity, 0) + 1
     if not counts:
-        return []
+        return restriction.activities
     names = sorted(counts)
     title = code + (":" + "+".join(restriction.filters).upper() if restriction.filters else "")
     print(f"\nActivities in {title}:")
@@ -120,7 +120,7 @@ def ask_activities(code, restriction, events, default):
     while True:
         answer = input(f"Which do you teach? (e.g. 1 3, all, Enter for {'/'.join(default)}): ")
         if not answer.strip():
-            return []
+            return restriction.activities
         try:
             return [names[i] for i in parse_selection(answer, len(names))]
         except ValueError as error:
