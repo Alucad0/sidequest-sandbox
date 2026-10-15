@@ -10,6 +10,11 @@ A collection of smaller games and projects.
 ## TODO
 
 - [ ] PortalKing
+- [ ] KTH medvind automatic time reporter
+- [ ] samsung notes to github/drive
+  - keep dir structure
+  - transfer .notes files and convert files to pdf's
+  - update the pdf's if the original file was modified
 - [ ] Demon Bluff solver
 - [ ] Minesweeper
 - [ ] Sudoku
