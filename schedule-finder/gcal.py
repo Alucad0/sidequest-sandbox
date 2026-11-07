@@ -25,14 +25,20 @@ def connect():
     if not CREDENTIALS.exists():
         raise RuntimeError(f"Missing {CREDENTIALS.name}, see 'Google Calendar setup' in the README")
 
+    from google.auth.exceptions import RefreshError
+
     creds = Credentials.from_authorized_user_file(str(TOKEN), SCOPES) if TOKEN.exists() else None
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
+    if creds and not creds.valid and creds.expired and creds.refresh_token:
+        try:
             creds.refresh(Request())
-        else:
-            # opens the browser once to sign in, after that the saved token is reused
-            creds = InstalledAppFlow.from_client_secrets_file(str(CREDENTIALS), SCOPES).run_local_server(port=0)
-        TOKEN.write_text(creds.to_json())
+        except RefreshError:
+            # Google expires the sign-in about once a week while the app is in testing mode
+            creds = None
+    if not creds or not creds.valid:
+        # opens the browser to sign in, after that the saved token is reused
+        print("Signing in to Google, a browser window will open (or use the link below).")
+        creds = InstalledAppFlow.from_client_secrets_file(str(CREDENTIALS), SCOPES).run_local_server(port=0)
+    TOKEN.write_text(creds.to_json())
     return build("calendar", "v3", credentials=creds)
 
 
