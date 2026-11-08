@@ -1,5 +1,6 @@
 import argparse
 import json
+import re
 import sys
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
@@ -14,6 +15,11 @@ REPORTED = HERE / "reported.json"  # calendar events already reported, so they'r
 DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 # only teaching sessions ("DD1310-Övning") get preparation time, meetings are reported as they are
 SESSIONS = ("övning", "laboration", "datorlaboration", "labb")
+
+
+def from_schedule_finder(title):
+    # titles the schedule finder makes, like "DD1310-Övning"; "? DD1310-Övning" (not confirmed) and meetings don't match
+    return re.match(r"[A-Z]{2}\d{4}[A-Z]?-\S", title) is not None
 
 
 def is_session(title):
@@ -134,8 +140,6 @@ def check(entries, medvind, settings, reported):
             done = reported[entry.event.id]
             entry.start = datetime.fromisoformat(f"{done['date']}T{done['start']}")
             entry.end = datetime.fromisoformat(f"{done['date']}T{done['end']}")
-        elif entry.event.title.startswith("?"):
-            entry.status = "not confirmed (?)"
         elif entry.event.end > now:
             entry.status = "not worked yet"
         elif entry.start.date() != entry.day or entry.end.date() != entry.day:
@@ -246,8 +250,12 @@ def main():
         events = gcal.work_events(service, gcal.find_calendar(service, args.calendar), args.start, args.end)
     except (LookupError, RuntimeError) as error:
         sys.exit(str(error))
+    others = sum(not from_schedule_finder(e.title) for e in events)
+    events = [e for e in events if from_schedule_finder(e.title)]
+    if others:
+        print(f"  {others} events left out (not from the schedule finder, or marked with ?)")
     if not events:
-        print("No events, nothing to report")
+        print("No sessions, nothing to report")
         return
     entries = plan(events, timedelta(minutes=args.prep))
 
