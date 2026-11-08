@@ -39,10 +39,12 @@ class Entry:
         return self.event.start.date()
 
     def comment(self):
-        # "DD1310-Övning" 08:00-10:00 -> "DD1310, Övning kl 8-10", like the entries made by hand
+        # "DD1310-Datorlaboration" for CMATD1, COPEN1 at 16:00-18:00 -> "DD1310-labb, CMATD/COPEN, 16-18"
+        # the hours are the session's own, not the reported time with prep
         course, _, activity = self.event.title.partition("-")
-        title = f"{course.strip()}, {activity.strip()}" if activity else course.strip()
-        return f"{title} kl {clock(self.event.start)}-{clock(self.event.end)}"
+        parts = [f"{course.strip()}-{short(activity)}", classes(self.event.description),
+                 f"{clock(self.event.start)}-{clock(self.event.end)}"]
+        return ", ".join(p for p in parts if p)
 
     def interval(self, settings):
         return {
@@ -54,6 +56,25 @@ class Entry:
             "avvkonto": settings["account"],
             "tidtyp_orsak": self.comment(),
         }
+
+
+def short(activity):
+    # TimeEdit's activity names, shortened the way they're written by hand
+    activity = activity.strip().lower()
+    if "laboration" in activity:
+        return "labb"
+    if activity.startswith("övning"):
+        return "övn"
+    return activity
+
+
+def classes(description):
+    # the schedule finder's programme line, "CMATD1, COPEN1" -> "CMATD/COPEN"
+    for line in description.splitlines():
+        codes = [c.strip() for c in line.split(",")]
+        if codes and all(re.fullmatch(r"[A-Z]{4,6}\d?", c) for c in codes):
+            return "/".join(dict.fromkeys(c.rstrip("0123456789") for c in codes))
+    return ""
 
 
 def clock(t):

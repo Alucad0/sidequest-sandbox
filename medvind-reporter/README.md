@@ -17,8 +17,8 @@ Opening Medvind
 
 Teoretisk datalogi Personal (JHT), Intermittent, Anstnr: 1234567:04  (Student(165), account JHT,110210,, 75 min prep)
    ✓ Wed 28 Oct  13:00-15:00  DD1310-Datorlaboration -> 11:45-15:00 3.25 h  already reported
-   1 Wed 04 Nov  16:00-18:00  DD1310-Datorlaboration -> 14:45-18:00 3.25 h  DD1310, Datorlaboration kl 16-18
-   2 Fri 06 Nov  13:00-14:00  DD1310-Övning      -> 11:45-14:00 2.25 h  DD1310, Övning kl 13-14
+   1 Wed 04 Nov  16:00-18:00  DD1310-Datorlaboration -> 14:45-18:00 3.25 h  DD1310-labb, CMATD/COPEN, 16-18
+   2 Fri 06 Nov  13:00-14:00  DD1310-Övning      -> 11:45-14:00 2.25 h  DD1310-övn, TINTE, 13-14
 
 Which do you want to report in Medvind? (e.g. 1 3 5-8, all, Enter for none): all
 ```
@@ -28,7 +28,7 @@ Only events with a schedule finder title like `DD1310-Övning` are listed. Meeti
 Each session is reported as:
 
 - **Time:** labs and övningar get `--prep` minutes before them, other activities keep their own time. When picked shifts would overlap, the later one is moved later, keeping its length.
-- **Comment:** e.g. `DD1310, Övning kl 13-15`, made from the title.
+- **Comment:** course and activity, class, and the session's own hours (not the reported time), e.g. `DD1310-labb, CMATD/COPEN, 16-18` or `DD1310-övn, TINTE, 13-15`. The class comes from the programme line the schedule finder writes in the description.
 - **Time type, task and account:** copied from a shift you reported by hand (see Setup).
 
 An event is never reported twice. Reported events are remembered in `reported.json`, and an event that overlaps time already in Medvind is skipped, for example one you reported by hand. So are sessions that haven't ended yet, and days in a locked (attested) period. After saving, each day is read back from Medvind to check the shifts are there.

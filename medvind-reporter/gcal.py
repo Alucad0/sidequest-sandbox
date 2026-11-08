@@ -16,6 +16,7 @@ class WorkEvent:
     title: str
     start: datetime
     end: datetime
+    description: str = ""  # from the schedule finder: group, programmes, offering, teacher
 
 
 def connect():
@@ -77,6 +78,7 @@ def work_events(service, calendar_id, start, end):
                 title=item.get("summary", "(no title)"),
                 start=local(item["start"]["dateTime"]),
                 end=local(item["end"]["dateTime"]),
+                description=item.get("description", ""),
             ))
         page = result.get("nextPageToken")
         if not page:
