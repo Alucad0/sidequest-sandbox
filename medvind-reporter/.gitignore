@@ -1,0 +1,6 @@
+credentials.json
+token.json
+settings.json
+reported.json
+browser-profile/
+__pycache__/
