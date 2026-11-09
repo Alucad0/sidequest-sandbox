@@ -28,9 +28,29 @@ class MedvindError(Exception):
     pass
 
 
-BROWSERS = ["auto", "msedge", "chrome", "chromium", "firefox"]
-# what "auto" tries: the Chrome or Edge you have installed, then Playwright's own Chromium
-AUTO = ["chrome", "msedge", "chromium"]
+BROWSERS = ["auto", "firefox", "chrome", "msedge", "chromium"]
+# Windows' name for the default browser -> Playwright's
+DEFAULTS = {"firefox": "firefox", "chrome": "chrome", "msedge": "msedge"}
+
+
+def default_browser():
+    # the browser Windows opens links in, e.g. "FirefoxURL-308046B0AF4A39CB" or "ChromeHTML"
+    try:
+        import winreg
+
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                             r"Software\Microsoft\Windows\Shell\Associations\UrlAssociations\https\UserChoice")
+        prog_id = winreg.QueryValueEx(key, "ProgId")[0].lower()
+    except (ImportError, OSError):
+        return None
+    return next((name for key, name in DEFAULTS.items() if prog_id.startswith(key)), None)
+
+
+def auto_order():
+    # your default browser first, then the others
+    order = ["chrome", "msedge", "firefox", "chromium"]
+    default = default_browser()
+    return [default] + [b for b in order if b != default] if default else order
 
 
 def launch(playwright, browser):
@@ -53,7 +73,7 @@ class Medvind:
             raise RuntimeError("Medvind needs: pip install -r requirements.txt")
         self.playwright = sync_playwright().start()
         errors = []
-        for name in AUTO if browser == "auto" else [browser]:
+        for name in auto_order() if browser == "auto" else [browser]:
             try:
                 self.context = launch(self.playwright, name)
                 break

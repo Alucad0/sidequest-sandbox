@@ -1,8 +1,10 @@
 import argparse
 import json
+import math
 import re
 import sys
 from dataclasses import dataclass
+from decimal import Decimal
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -13,8 +15,7 @@ HERE = Path(__file__).parent
 SETTINGS = HERE / "settings.json"  # placement, time type, task and account to report on
 REPORTED = HERE / "reported.json"  # calendar events already reported, so they're never reported twice
 DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-# only teaching sessions ("DD1310-Övning") get preparation time, meetings are reported as they are
-SESSIONS = ("övning", "laboration", "datorlaboration", "labb")
+FACTOR = "1.8"  # KTH's schablonfaktor for teaching, preparation included
 
 
 def from_schedule_finder(title):
@@ -22,15 +23,19 @@ def from_schedule_finder(title):
     return re.match(r"[A-Z]{2}\d{4}[A-Z]?-\S", title) is not None
 
 
-def is_session(title):
-    _, _, activity = title.partition("-")
-    return activity.strip().lower().startswith(SESSIONS)
+def paid_minutes(event, factor):
+    # sessions start a quarter past (10-12 is 1 h 45 min) except at 8:00 (8-10 is 2 h),
+    # then times the factor, rounded up to whole quarters: 8-10 -> 3 h 45 min, 10-12 -> 3 h 15 min
+    worked = int((event.end - event.start).total_seconds()) // 60
+    if (event.start.hour, event.start.minute) != (8, 0):
+        worked -= 15
+    return math.ceil(max(worked, 0) * Decimal(factor) / 15) * 15
 
 
 @dataclass
 class Entry:
     event: gcal.WorkEvent
-    start: datetime  # the reported time, prep included
+    start: datetime  # the reported time, which ends when the session ends
     end: datetime
     status: str = ""  # empty = can be reported
 
@@ -40,7 +45,7 @@ class Entry:
 
     def comment(self):
         # "DD1310-Datorlaboration" for CMATD1, COPEN1 at 16:00-18:00 -> "DD1310-labb, CMATD/COPEN, 16-18"
-        # the hours are the session's own, not the reported time with prep
+        # the hours are the session's own, not the reported time
         course, _, activity = self.event.title.partition("-")
         parts = [f"{course.strip()}-{short(activity)}", classes(self.event.description),
                  f"{clock(self.event.start)}-{clock(self.event.end)}"]
@@ -138,11 +143,11 @@ def setup(medvind):
     sys.exit("Report one shift on that placement by hand first, so its time type and account can be copied")
 
 
-def plan(events, prep):
-    # each event gets prep time before it, and on busy days the next one is moved later so they don't overlap
+def plan(events, factor):
+    # each session is reported as its paid time ending when it ends, and on busy days the next one is moved later
     entries, previous = [], None
     for event in sorted(events, key=lambda e: e.start):
-        start, end = event.start - (prep if is_session(event.title) else timedelta(0)), event.end
+        start, end = event.end - timedelta(minutes=paid_minutes(event, factor)), event.end
         if previous and previous.day == event.start.date() and start < previous.end:
             start, end = previous.end, previous.end + (end - start)
         entries.append(Entry(event, start, end))
@@ -256,7 +261,7 @@ def main():
     parser.add_argument("--from", dest="start", type=date.fromisoformat, default=first_of_last_month,
                         help="YYYY-MM-DD, default the first day of last month")
     parser.add_argument("--to", dest="end", type=date.fromisoformat, default=today, help="YYYY-MM-DD, default today")
-    parser.add_argument("--prep", type=int, default=75, help="minutes of preparation added before each lab or övning (default 75)")
+    parser.add_argument("--factor", default=FACTOR, help=f"schablonfaktor the teaching time is multiplied by (default {FACTOR})")
     parser.add_argument("--calendar", default="WORK", help="Google Calendar to read (default WORK)")
     parser.add_argument("--browser", default="auto", choices=BROWSERS,
                         help="browser to log in with (default auto: Chrome, else Edge, else Playwright's Chromium)")
@@ -279,7 +284,7 @@ def main():
     if not events:
         print("No sessions, nothing to report")
         return
-    entries = plan(events, timedelta(minutes=args.prep))
+    entries = plan(events, args.factor)
 
     print("Opening Medvind")
     try:
@@ -296,7 +301,7 @@ def main():
         days = check(entries, medvind, settings, reported)
 
         print(f"\n{settings['placement']['plantext']}, Anstnr: {settings['placement']['anstnr']}"
-              f"  ({settings.get('time_type_text', '')}, account {settings['account']}, {args.prep} min prep)")
+              f"  ({settings.get('time_type_text', '')}, account {settings['account']}, factor {args.factor})")
         numbered = show(entries)
         if not numbered:
             print("\nNothing new to report")
@@ -308,7 +313,7 @@ def main():
         if not chosen:
             return
         # plan again with only the picked events, so one left out doesn't push the others later
-        chosen = plan([e.event for e in chosen], timedelta(minutes=args.prep))
+        chosen = plan([e.event for e in chosen], args.factor)
         days.update(check(chosen, medvind, settings, reported))
         if any(e.status for e in chosen):
             print("\nSome can't be reported after all:")
