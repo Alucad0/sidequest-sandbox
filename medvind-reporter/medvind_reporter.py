@@ -53,6 +53,7 @@ class Entry:
     start: datetime  # the reported time, which ends when the session ends
     end: datetime
     factor: str = "1"
+    moved: bool = False  # moved later, the planned time was taken in Medvind
     status: str = ""  # empty = can be reported
 
     @property
@@ -107,6 +108,10 @@ def classes(description):
 
 def clock(t):
     return f"{t.hour}" if t.minute == 0 else f"{t.hour}:{t.minute:02d}"
+
+
+def clock_hm(minutes_after_midnight):
+    return f"{minutes_after_midnight // 60:02}:{minutes_after_midnight % 60:02}"
 
 
 def minutes(t):
@@ -167,23 +172,35 @@ def setup(medvind):
 
 
 def plan(events, factors):
-    # each session is reported as its paid time ending when it ends, and on busy days the next one is moved later
-    entries, previous = [], None
+    # each session is reported as its paid time ending when the session ends; check() moves it if that time is taken
+    entries = []
     for event in sorted(events, key=lambda e: e.start):
         factor = factor_for(event, factors)
-        start, end = event.end - timedelta(minutes=paid_minutes(event, factor)), event.end
-        if previous and previous.day == event.start.date() and start < previous.end:
-            start, end = previous.end, previous.end + (end - start)
-        entries.append(Entry(event, start, end, factor))
-        previous = entries[-1]
+        entries.append(Entry(event, event.end - timedelta(minutes=paid_minutes(event, factor)), event.end, factor))
     return entries
 
 
+def place(entry, busy):
+    # the start (minutes after midnight) of the first free slot, from the planned one and later in whole quarters
+    length = int((entry.end - entry.start).total_seconds()) // 60
+    start = minutes(entry.end) - length
+    while start + length <= 24 * 60:
+        clash = [b for b in busy if b[0] < start + length and start < b[1]]
+        if start >= 0 and not clash:
+            return start
+        later = max([start, 0] + [b[1] for b in clash])
+        start = max(math.ceil(later / 15) * 15, start + 15)
+    return None
+
+
 def check(entries, medvind, settings, reported):
-    # mark what can't or shouldn't be reported, and keep each day's Medvind entry for saving
+    # mark what can't or shouldn't be reported, move shifts off time that's already planned,
+    # and keep each day's Medvind entry for saving
     placement = settings["placement"]
-    days = {}
+    loaded, own, taken = {}, {}, {}
     now = datetime.now()
+    # shifts this program reported, so they aren't mistaken for ones reported by hand
+    ours = {(r["date"], r["start"], r["end"]) for r in reported.values()}
     for entry in entries:
         if entry.event.id in reported:
             entry.status = "already reported"
@@ -192,22 +209,36 @@ def check(entries, medvind, settings, reported):
             entry.end = datetime.fromisoformat(f"{done['date']}T{done['end']}")
         elif entry.event.end > now:
             entry.status = "not worked yet"
-        elif entry.start.date() != entry.day or entry.end.date() != entry.day:
-            entry.status = "crosses midnight, report it by hand"
         if entry.status:
             continue
-        if entry.day not in days:
-            days[entry.day] = next((e for e in medvind.load_day(entry.day)
-                                    if e["anstnr"] == placement["anstnr"] and e["planid"] == placement["planid"]), None)
-        day = days[entry.day]
+        if entry.day not in loaded:
+            loaded[entry.day] = medvind.load_day(entry.day)
+            own[entry.day] = next((e for e in loaded[entry.day]
+                                   if e["anstnr"] == placement["anstnr"] and e["planid"] == placement["planid"]), None)
+            # every placement's shifts count as busy, like the daily planning on another placement
+            taken[entry.day] = [(int(i["start"]), int(i["slut"])) for e in loaded[entry.day] for i in e.get("intv", [])]
+        day = own[entry.day]
+        session = (minutes(entry.event.start), minutes(entry.event.end))
         if day is None:
             entry.status = "placement not open that day"
         elif day.get("readonly") == "1":
             entry.status = day.get("readonly_reason") or "locked"
-        elif any(int(i["start"]) < minutes(entry.end) and minutes(entry.start) < int(i["slut"]) for i in day.get("intv", [])):
-            # either reported by hand already, or it clashes with another shift that day
-            entry.status = "overlaps time already in Medvind"
-    return days
+        elif any(int(i["start"]) < session[1] and session[0] < int(i["slut"])
+                 and (entry.day.isoformat(), clock_hm(int(i["start"])), clock_hm(int(i["slut"]))) not in ours
+                 for i in day.get("intv", [])):
+            # a shift on your placement during the session itself, most likely reported by hand
+            entry.status = "already in Medvind"
+        else:
+            start = place(entry, taken[entry.day])
+            if start is None:
+                entry.status = "no free time that day"
+                continue
+            length = entry.end - entry.start
+            moved = datetime.combine(entry.day, datetime.min.time()) + timedelta(minutes=start)
+            entry.moved = moved != entry.start
+            entry.start, entry.end = moved, moved + length
+            taken[entry.day].append((start, start + int(length.total_seconds()) // 60))
+    return own
 
 
 def show(entries):
@@ -219,9 +250,10 @@ def show(entries):
             numbered.append(entry)
             mark = str(len(numbered))
         e = entry.event
-        hours = (entry.end - entry.start).total_seconds() / 3600
+        length = (entry.end - entry.start).total_seconds() / 3600
+        moved = " (moved, time taken)" if entry.moved and not entry.status else ""
         print(f"  {mark:>2} {DAYS[e.start.weekday()]} {e.start:%d %b}  {e.start:%H:%M}-{e.end:%H:%M}  {e.title:<18}"
-              f" -> {entry.start:%H:%M}-{entry.end:%H:%M} {hours:4.2f} h  {entry.status or entry.comment()}")
+              f" -> {entry.start:%H:%M}-{entry.end:%H:%M} {length:4.2f} h  {entry.status or entry.comment()}{moved}")
     return numbered
 
 
