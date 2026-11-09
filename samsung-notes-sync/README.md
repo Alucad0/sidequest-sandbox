@@ -16,7 +16,7 @@ python notes_sync.py --github --drive
 ```
 
 ```output
-495 notes in Samsung Notes, copying to C:\Users\Fredrik\Documents\Samsung Notes
+495 notes in Samsung Notes, copying to C:\Users\you\Documents\Samsung Notes
   moved    SF1688 - Disk Matte/ex tenta
   [1/2] updated  SF1688 - Disk Matte/formelsamling
   [2/2] new      SF1688 - Disk Matte/Tentor/ex tenta

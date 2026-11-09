@@ -7,7 +7,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import gcal
-from medvind import Medvind, MedvindError
+from medvind import BROWSERS, Medvind, MedvindError
 
 HERE = Path(__file__).parent
 SETTINGS = HERE / "settings.json"  # placement, time type, task and account to report on
@@ -258,7 +258,8 @@ def main():
     parser.add_argument("--to", dest="end", type=date.fromisoformat, default=today, help="YYYY-MM-DD, default today")
     parser.add_argument("--prep", type=int, default=75, help="minutes of preparation added before each lab or övning (default 75)")
     parser.add_argument("--calendar", default="WORK", help="Google Calendar to read (default WORK)")
-    parser.add_argument("--browser", default="msedge", help="msedge or chrome (default msedge)")
+    parser.add_argument("--browser", default="auto", choices=BROWSERS,
+                        help="browser to log in with (default auto: Chrome, else Edge, else Playwright's Chromium)")
     parser.add_argument("--setup", action="store_true", help="pick the Medvind placement again")
     parser.add_argument("--dry-run", action="store_true", help="show what would be reported without reporting it")
     args = parser.parse_args()
@@ -281,7 +282,10 @@ def main():
     entries = plan(events, timedelta(minutes=args.prep))
 
     print("Opening Medvind")
-    medvind = Medvind(args.browser)
+    try:
+        medvind = Medvind(args.browser)
+    except (MedvindError, RuntimeError) as error:
+        sys.exit(f"Medvind: {error}")
     try:
         medvind.open()
         settings = None if args.setup else load_json(SETTINGS) or None

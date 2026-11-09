@@ -28,21 +28,40 @@ class MedvindError(Exception):
     pass
 
 
+BROWSERS = ["auto", "msedge", "chrome", "chromium", "firefox"]
+# what "auto" tries: the Chrome or Edge you have installed, then Playwright's own Chromium
+AUTO = ["chrome", "msedge", "chromium"]
+
+
+def launch(playwright, browser):
+    # each browser gets its own profile folder, their profiles don't mix
+    options = {"headless": False, "no_viewport": True}
+    profile = str(PROFILE / browser)
+    if browser == "firefox":
+        # Playwright can't drive your installed Firefox, only its own build: python -m playwright install firefox
+        return playwright.firefox.launch_persistent_context(profile, **options)
+    # with the sandbox on, Playwright doesn't add --no-sandbox (which Edge and Chrome warn about)
+    channel = None if browser == "chromium" else browser
+    return playwright.chromium.launch_persistent_context(profile, channel=channel, chromium_sandbox=True, **options)
+
+
 class Medvind:
-    def __init__(self, browser="msedge"):
+    def __init__(self, browser="auto"):
         try:
             from playwright.sync_api import sync_playwright
         except ImportError:
             raise RuntimeError("Medvind needs: pip install -r requirements.txt")
         self.playwright = sync_playwright().start()
-        try:
-            # your own Edge or Chrome, in a window you log in to yourself
-            self.context = self.playwright.chromium.launch_persistent_context(
-                # with the sandbox on, Playwright doesn't add --no-sandbox (which Edge warns about)
-                str(PROFILE), channel=browser, headless=False, no_viewport=True, chromium_sandbox=True)
-        except Exception:
+        errors = []
+        for name in AUTO if browser == "auto" else [browser]:
+            try:
+                self.context = launch(self.playwright, name)
+                break
+            except Exception as error:
+                errors.append(f"{name}: {str(error).splitlines()[0]}")
+        else:
             self.playwright.stop()
-            raise
+            raise MedvindError("couldn't start a browser, see 'Browsers' in the README\n  " + "\n  ".join(errors))
         # KTH's login only sets cookies that end with the browser, so they are kept here between runs
         if SESSION.exists():
             try:
@@ -58,8 +77,11 @@ class Medvind:
             cookies = [c for c in self.context.cookies() if c.get("expires", -1) == -1]
             SESSION.write_text(json.dumps(cookies), encoding="utf-8")
         except Exception:
+            pass  # the window was already closed
+        try:
+            self.context.close()
+        except Exception:
             pass
-        self.context.close()
         self.playwright.stop()
 
     def open(self):
@@ -68,6 +90,8 @@ class Medvind:
         on_login_since = None
         deadline = time.monotonic() + LOGIN_TIMEOUT
         while time.monotonic() < deadline:
+            if self.page.is_closed():
+                raise MedvindError("the browser window was closed before Medvind opened")
             for frame in self.page.frames:
                 if MEDVIND_HOST in frame.url:
                     try:
@@ -85,9 +109,12 @@ class Medvind:
                 # a remembered login only passes through KTH's login page, so wait a moment before asking
                 on_login_since = on_login_since or time.monotonic()
                 if not told and time.monotonic() - on_login_since > 4:
-                    print("Log in to KTH in the browser window that opened (the login is remembered for later runs).")
+                    print("Log in to KTH in the browser window that opened (the session is kept for a while after).")
                     told = True
-            self.page.wait_for_timeout(1000)
+            try:
+                self.page.wait_for_timeout(1000)
+            except Exception:
+                pass  # the window was closed, caught at the top of the loop
         raise MedvindError("Medvind didn't open, log in within 5 minutes and try again")
 
     def call(self, module, func, params, xml=None, mask=True):
