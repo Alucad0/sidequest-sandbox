@@ -14,10 +14,10 @@ python medvind_reporter.py --dry-run
 `--dry-run` only shows what would be reported. Without it, you pick what to report:
 
 ```output
-Avdelning Personal (ABC), Intermittent, Anstnr: 1234567:04  (Student(165), account ABC,123456,, factor 1.8)
+Avdelning Personal (ABC), Intermittent, Anstnr: 1234567:04  (Student(165), account ABC,123456,, factor 1.8, övning 2)
    ✓ Wed 28 Oct  13:00-15:00  DD1310-Datorlaboration -> 11:45-15:00 3.25 h  already reported
-   1 Wed 04 Nov  08:00-10:00  DD1310-Datorlaboration -> 06:15-10:00 3.75 h  DD1310-labb, CMATD/COPEN, 8-10
-   2 Fri 06 Nov  13:00-14:00  DD1310-Övning      -> 12:30-14:00 1.50 h  DD1310-övn, TINTE, 13-14
+   1 Wed 04 Nov  08:00-10:00  DD1310-Datorlaboration -> 06:15-10:00 3.75 h  DD1310-labb, CMATD/COPEN, 8-10, 2h*1.8=3.6h -> 3.75h
+   2 Fri 06 Nov  13:00-14:00  DD1310-Övning      -> 12:30-14:00 1.50 h  DD1310-övn, TINTE, 13-14, 0.75h*2=1.5h
    ✗ Mon 09 Nov  10:00-12:00  DD1310-Datorlaboration -> 08:45-12:00 3.25 h  not worked yet
 
 Which do you want to report in Medvind? (e.g. 1 3 5-8, all, Enter for none): all
@@ -28,11 +28,19 @@ Reported 2 of 2 in Medvind, they still need your manager's approval
 
 ## How hours are counted
 
-1. **Worked time:** sessions start a quarter past, so 10–12 is 1 h 45 min. Sessions at 8:00 start on the hour, so 8–10 is 2 h.
-2. **Times 1.8** (the schablonfaktor), rounded up to whole quarters: 8–10 → 3 h 45 min, 10–12 → 3 h 15 min.
-3. The shift ends when the session ends, e.g. 06:15–10:00. Shifts that would overlap are moved later.
+1. **Worked time:** sessions start a quarter past, so 10–12 is 1.75 h. Sessions at 8:00 start on the hour, so 8–10 is 2 h.
+2. **Times the schablonfaktor:** 2 for övningar, 1.8 for labs and the rest.
+3. **Rounded UP** to the nearest 15 minutes.
 
-The comment says what it was: `DD1310-labb, CMATD/COPEN, 8-10`.
+| Session | Calculation | Reported |
+|---|---|---|
+| lab 8–10 | 2h × 1.8 = 3.6h, up to 3.75h | 06:15–10:00 |
+| lab 10–12 | 1.75h × 1.8 = 3.15h, up to 3.25h | 08:45–12:00 |
+| övning 13–14 | 0.75h × 2 = 1.5h | 12:30–14:00 |
+
+The shift ends when the session ends, and shifts that would overlap are moved later. The comment in Medvind shows the session and the calculation (`->` = rounded up):
+
+`DD1310-labb, CMATD/COPEN, 8-10, 2h*1.8=3.6h -> 3.75h`
 
 ## What is skipped
 
@@ -47,7 +55,7 @@ The comment says what it was: `DD1310-labb, CMATD/COPEN, 8-10`.
 |---|---|
 | `--from`, `--to` | dates, `YYYY-MM-DD` (default the 1st of last month to today) |
 | `--dry-run` | only show what would be reported |
-| `--factor` | schablonfaktor (default 1.8) |
+| `--factor`, `--factor-ovning` | schablonfaktor for labs (1.8) and övningar (2) |
 | `--calendar` | calendar to read (default `WORK`) |
 | `--browser` | `auto`, `firefox`, `chrome`, `msedge` or `chromium` |
 | `--setup` | pick the Medvind placement again |
