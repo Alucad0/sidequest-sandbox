@@ -16,7 +16,7 @@ python medvind_reporter.py --dry-run
 ```output
 Avdelning Personal (ABC), Intermittent, Anstnr: 1234567:04  (Student(165), account ABC,123456,, factor 1.8, övning 2)
    ✓ Wed 28 Oct  13:00-15:00  DD1310-Datorlaboration -> 11:45-15:00 3.25 h  already reported
-   1 Wed 04 Nov  08:00-10:00  DD1310-Datorlaboration -> 06:15-10:00 3.75 h  DD1310-labb, CMATD/COPEN, 8-10, 2h*1.8=3.6h -> 3.75h
+   1 Wed 04 Nov  08:00-10:00  DD1310-Datorlaboration -> 06:15-10:00 3.75 h  DD1310-labb, CMATD/COPEN, 8-10, 2h*1.8=3.6h up to 3.75h
    2 Fri 06 Nov  13:00-14:00  DD1310-Övning      -> 12:30-14:00 1.50 h  DD1310-övn, TINTE, 13-14, 0.75h*2=1.5h
    ✗ Mon 09 Nov  10:00-12:00  DD1310-Datorlaboration -> 08:45-12:00 3.25 h  not worked yet
 
@@ -38,9 +38,9 @@ Reported 2 of 2 in Medvind, they still need your manager's approval
 | lab 10–12 | 1.75h × 1.8 = 3.15h, up to 3.25h | 08:45–12:00 |
 | övning 13–14 | 0.75h × 2 = 1.5h | 12:30–14:00 |
 
-The shift ends when the session ends, and shifts that would overlap are moved later. The comment in Medvind shows the session and the calculation (`->` = rounded up):
+The shift ends when the session ends, and shifts that would overlap are moved later. The comment in Medvind shows the session and the calculation:
 
-`DD1310-labb, CMATD/COPEN, 8-10, 2h*1.8=3.6h -> 3.75h`
+`DD1310-labb, CMATD/COPEN, 8-10, 2h*1.8=3.6h up to 3.75h`
 
 ## What is skipped
 
