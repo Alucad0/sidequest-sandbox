@@ -132,20 +132,24 @@ def overlaps(a, b, buffer=timedelta(0)):
 
 
 def report(name, sessions, busy, booked, buffer, free_only, numbered):
+    # booked maps a TimeEdit id to its calendar entry
     # a session already in the calendar shouldn't clash with its own calendar entry
     clashes = {s.id: [b for b in busy if b.id != s.id and overlaps(s, b, buffer)] for s in sessions}
-    free = [s for s in sessions if not clashes[s.id] and s.id not in booked]
+    # booked only counts when the calendar entry is still at TimeEdit's time; a moved one is listed so it can be fixed
+    in_place = {s.id for s in sessions if s.id in booked and (booked[s.id].start, booked[s.id].end) == (s.start, s.end)}
+    free = [s for s in sessions if not clashes[s.id] and s.id not in in_place]
     print(f"\n{name}")
     print(f"{len(sessions)} sessions, {len(free)} fit your schedule")
 
     week = None
     for s in sessions:
-        if free_only and (clashes[s.id] or s.id in booked):
+        if free_only and (clashes[s.id] or s.id in in_place):
             continue
         if s.start.isocalendar()[1] != week:
             week = s.start.isocalendar()[1]
             print(f"\n  Week {week}")
-        if s.id in booked:
+        entry = booked.get(s.id)
+        if s.id in in_place:
             mark = "  ★"
         elif clashes[s.id]:
             mark = "  ✗"
@@ -155,43 +159,65 @@ def report(name, sessions, busy, booked, buffer, free_only, numbered):
             mark = f"{len(numbered):>3}"
         who = s.group() + (f" ({s.programs})" if s.programs else "")
         line = f"  {mark} {s.start:%a %d %b %H:%M}-{s.end:%H:%M}  {s.activity:<15} {who}"
-        if s.id in booked:
-            line += "   already booked"
+        if s.id in in_place:
+            line += "   already booked" + (" (maybe)" if is_maybe(entry.activity) else "")
         elif clashes[s.id]:
             line += "   clashes with " + "; ".join(f"{b.label()} {b.start:%H:%M}" for b in clashes[s.id][:2])
+        if entry and s.id not in in_place:
+            line += f"   {'but ' if clashes[s.id] else ''}in {entry.course.rstrip(':')} at {entry.start:%a %d %b %H:%M}-{entry.end:%H:%M}"
+            if not clashes[s.id]:
+                line += ", pick it to move it to this time"
         print(line)
 
 
-def parse_selection(text, count):
+def is_maybe(title):
+    # "? DD1310-Övning" isn't confirmed yet
+    return title.lstrip().startswith("?")
+
+
+def parse_selection(text, count, allow_maybe=False):
     # "1 3 5-8" or "all" -> [0, 2, 4, 5, 6, 7]
-    if text.strip().lower() == "all":
-        return list(range(count))
-    chosen = set()
+    return sorted(parse_picks(text, count, allow_maybe))
+
+
+def parse_picks(text, count, allow_maybe=True):
+    # "1 ?3 5-6" -> {0: False, 2: True, 4: False, 5: False}, where True means maybe ("?" in front)
+    chosen = {}
     for part in text.replace(",", " ").split():
+        maybe = part.startswith("?")
+        if maybe:
+            if not allow_maybe:
+                raise ValueError(f"'{part}' isn't a number from the list")
+            part = part[1:]
+        if part.lower() == "all":
+            chosen.update({i: maybe for i in range(count)})
+            continue
         first, _, last = part.partition("-")
         if not first.isdigit() or (last and not last.isdigit()):
             raise ValueError(f"'{part}' isn't a number from the list")
         for n in range(int(first), int(last or first) + 1):
             if not 1 <= n <= count:
                 raise ValueError(f"There is no {n} in the list")
-            chosen.add(n - 1)
-    return sorted(chosen)
+            chosen[n - 1] = maybe
+    return chosen
 
 
 def pick(name, sessions):
+    # returns the picked sessions and the ids of the ones marked as maybe
     while True:
-        answer = input(f"\nWhich sessions do you want in {name}? (e.g. 1 3 5-8, all, Enter for none): ")
+        answer = input(f"\nWhich sessions do you want in {name}? (e.g. 1 3 5-8, ?4 for maybe, all, Enter for none): ")
         try:
-            chosen = parse_selection(answer, len(sessions))
+            picks = parse_picks(answer, len(sessions))
         except ValueError as error:
             print(error)
             continue
+        chosen = sorted(picks)
         # two picked sessions at the same time would be a double booking too
         overlapping = [(a + 1, b + 1) for i, a in enumerate(chosen) for b in chosen[i + 1:] if overlaps(sessions[a], sessions[b])]
         if overlapping:
             print("These overlap each other: " + ", ".join(f"{a} and {b}" for a, b in overlapping))
             continue
-        return [sessions[i] for i in chosen]
+        return [sessions[i] for i in chosen], {sessions[i].id for i in chosen if picks[i]}
 
 
 def ask_list(prompt):
@@ -234,7 +260,7 @@ def main():
     print(f"Checking {args.start} to {end}")
 
     service = calendar_id = None
-    busy, booked = [], set()
+    busy, booked = [], {}
     if not args.no_calendar:
         try:
             service = gcal.connect()
@@ -242,7 +268,7 @@ def main():
             work = gcal.busy_events(service, calendar_id, args.calendar, args.start, end)
             print(f"  calendar {args.calendar}: {len(work)} events")
             busy += work
-            booked = {e.id for e in work}
+            booked = {e.id: e for e in work}
         except (LookupError, RuntimeError) as error:
             if not args.dry_run:
                 sys.exit(f"{error}\n(use --no-calendar or --dry-run to run without Google Calendar)")
@@ -272,16 +298,16 @@ def main():
 
     if not free or args.no_calendar:
         return
-    chosen = pick(args.calendar, free)
+    chosen, maybe = pick(args.calendar, free)
     if not chosen:
         return
     if args.dry_run or not service:
         print(f"\nDry run, these would be added to {args.calendar}:")
         for s in chosen:
-            body = gcal.event_body(s)
+            body = gcal.event_body(s, s.id in maybe)
             print(f"  {s.start:%a %d %b %H:%M}-{s.end:%H:%M}  {body['summary']}  @ {body['location']}")
         return
-    added, updated = gcal.add_events(service, calendar_id, chosen)
+    added, updated = gcal.add_events(service, calendar_id, chosen, maybe)
     print(f"Added {added} sessions to {args.calendar}" + (f", updated {updated} that were already there" if updated else ""))
 
 

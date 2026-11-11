@@ -28,9 +28,13 @@ Which sessions do you want in WORK? (e.g. 1 3 5-8, all, Enter for none): 1
 Added 1 sessions to WORK
 ```
 
-`★` = already in WORK, `✗` = clashes, numbers = free to pick.
+`★` = already in WORK at TimeEdit's time, `✗` = clashes, numbers = free to pick.
 
-Picked sessions get the title `DD1310-Övning`, TimeEdit's time and room, and the group and class in the description. Picking one twice updates it. The [Medvind reporter](../medvind-reporter/) reports them as worked hours later; put `?` in front of a title if it isn't confirmed yet.
+A session that is in WORK at another time than TimeEdit's (moved in TimeEdit or in the calendar) gets a number and says where it is in WORK; pick it to move it to TimeEdit's time.
+
+Picked sessions get the title `DD1310-Övning`, TimeEdit's time and room, and the group and class in the description. Picking one twice updates it. The [Medvind reporter](../medvind-reporter/) reports them as worked hours later.
+
+Put `?` in front of a number to add a session as a maybe, e.g. `1 ?3 ?5-8`, which gives it the title `? DD1310-Övning`. The Medvind reporter skips those until you remove the `?` in the calendar.
 
 ## Course specs
 

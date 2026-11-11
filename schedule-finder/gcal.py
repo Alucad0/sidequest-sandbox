@@ -90,12 +90,13 @@ def local(timestamp):
     return datetime.fromisoformat(timestamp.replace("Z", "+00:00")).astimezone().replace(tzinfo=None)
 
 
-def event_body(event):
+def event_body(event, maybe=False):
     details = [event.group(), event.programs, event.offering, event.teacher and f"Teacher: {event.teacher}", event.info]
     return {
         # a fixed id per TimeEdit booking means adding the same session twice can't make a duplicate
         "id": f"timeedit{event.id}",
-        "summary": f"{event.course}-{event.activity}",
+        # "? " marks a session that isn't confirmed yet, the Medvind reporter skips those
+        "summary": ("? " if maybe else "") + f"{event.course}-{event.activity}",
         "location": event.room,
         "description": "\n".join(d for d in details if d),
         "start": {"dateTime": event.start.isoformat(), "timeZone": TIMEZONE},
@@ -103,12 +104,13 @@ def event_body(event):
     }
 
 
-def add_events(service, calendar_id, events):
+def add_events(service, calendar_id, events, maybe=()):
+    # maybe: ids of the sessions to add with "?" in front of the title
     from googleapiclient.errors import HttpError
 
     added = updated = 0
     for event in events:
-        body = event_body(event)
+        body = event_body(event, event.id in maybe)
         try:
             service.events().insert(calendarId=calendar_id, body=body).execute()
             added += 1
