@@ -61,8 +61,8 @@ class Entry:
         return self.event.start.date()
 
     def comment(self):
-        # "DD1310-Datorlaboration" for CMATD1, COPEN1 at 16:00-18:00
-        # -> "DD1310-labb, CMATD/COPEN, 16-18, 1.75h*1.8=3.15h up to 3.25h" (rounded up to a quarter)
+        # "DD1310-Datorlaboration" for CMATD1, COPEN1 at 16:00-18:00 with Vahid Mosavat
+        # -> "DD1310-labb, Vahid Mosavat, CMATD/COPEN, 16-18, 1.75h*1.8=3.15h up to 3.25h" (rounded up to a quarter)
         course, _, activity = self.event.title.partition("-")
         worked = worked_minutes(self.event)
         exact = Decimal(worked) * Decimal(self.factor)
@@ -70,7 +70,7 @@ class Entry:
         paid = paid_minutes(self.event, self.factor)
         if paid != exact:
             calculation += f" up to {hours(paid)}"
-        parts = [f"{course.strip()}-{short(activity)}", classes(self.event.description),
+        parts = [f"{course.strip()}-{short(activity)}", teacher(self.event.description), classes(self.event.description),
                  f"{clock(self.event.start)}-{clock(self.event.end)}", calculation]
         # Medvind stores <, > and & escaped twice, so they're left out
         return re.sub(r"[<>&]", "", ", ".join(p for p in parts if p))
@@ -103,6 +103,14 @@ def classes(description):
         codes = [c.strip() for c in line.split(",")]
         if codes and all(re.fullmatch(r"[A-Z]{4,6}\d?", c) for c in codes):
             return "/".join(dict.fromkeys(c.rstrip("0123456789") for c in codes))
+    return ""
+
+
+def teacher(description):
+    # the schedule finder's "Teacher: Vahid Mosavat" line, the course coordinator in TimeEdit
+    for line in description.splitlines():
+        if line.startswith("Teacher:"):
+            return line.removeprefix("Teacher:").strip()
     return ""
 
 

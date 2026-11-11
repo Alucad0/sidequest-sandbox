@@ -38,9 +38,9 @@ Reported 2 of 2 in Medvind, they still need your manager's approval
 | lab 10–12 | 1.75h × 1.8 = 3.15h, up to 3.25h | 08:45–12:00 |
 | övning 13–14 | 0.75h × 2 = 1.5h | 12:30–14:00 |
 
-The shift ends when the session ends. If that time is already taken in Medvind, by planning on any placement or another shift, it's moved later to the first free quarter hour, e.g. past the daily 08:00–08:24 planning. The comment in Medvind shows the session and the calculation:
+The shift ends when the session ends. If that time is already taken in Medvind, by planning on any placement or another shift, it's moved later to the first free quarter hour, e.g. past the daily 08:00–08:24 planning. The comment in Medvind shows the session, the teacher from TimeEdit (the course coordinator) and the calculation:
 
-`DD1310-labb, CMATD/COPEN, 8-10, 2h*1.8=3.6h up to 3.75h`
+`DD1310-labb, Vahid Mosavat, CMATD/COPEN, 8-10, 2h*1.8=3.6h up to 3.75h`
 
 ## What is skipped
 
